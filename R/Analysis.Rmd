@@ -1,0 +1,680 @@
+---
+title: "S1PR1"
+author: "Uliano"
+date: "27/02/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(scales)
+
+source('gromacs1.R')
+
+twocol<-scales::hue_pal()(2)
+fourcols<-scales::hue_pal()(4)
+#system('./generate_files.sh')
+theme_set(theme_gray(base_size = 18))
+
+span<-0.1 # decide quanto sono smoothed le linee dei grafici (+ grande = + smooth)
+
+directories=c('S1PR1_Lys+S1P', 'S1PR1_Lys+FP')
+hbonds_tm <- 'hbonds_tm'
+saltbr <- 'saltbr'
+hbonds_lig <-'hbonds_lig'
+dt <- 100
+delta <- -0.05
+base <- 0.15
+diam <- 1
+category_name <- 'Ligand'
+categories <- c('S1P','FP')
+col_names <-c('time','distance')
+```
+
+# Global simulation properties
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+df <- read_many_files(directories,'temperature.xvg',category_name,categories,col_names=c('time','value'))
+p <- ggplot(df, aes(x=time, y=value, color=Ligand)) + 
+  geom_point(alpha=0.3) + 
+  geom_smooth(method="loess",span=span,se=FALSE) + 
+  labs(title='Temperature', x='Time (ps)',y='(K)') +
+  guides(colour = guide_legend(override.aes = list(alpha=1)))
+print(p)
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+df <- read_many_files(directories,'min_periodic_distance.xvg',category_name,categories,col_names= c('time','min','max','box1','box2','box3'))
+p <- ggplot(df, aes(x=time, y=min, color=Ligand)) + 
+  geom_point(alpha=0.3) + 
+  geom_smooth(method="loess",span=span,se=FALSE) + 
+  labs(title='Minimum distance to periodic image', x='Time (ps)',y='(nm)') +
+  guides(colour = guide_legend(override.aes = list(alpha=1)))
+print(p)
+```
+
+
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+time<-c(df$time, df$time)
+width<-c(df$box1,df$box3)
+side<-gl(2,k=nrow(df),labels=c('xy','z'))
+Ligand<-factor(c(as.character(df$Ligand), as.character(df$Ligand)),levels=(c('FP','S1P')))
+box<-data.frame(time,width,side,Ligand)
+p <- ggplot(box, aes(x=time, y=width, shape=side, color=Ligand)) + geom_point(alpha=0.2)+geom_smooth(method="loess",span=span,se=FALSE) + labs(title='Box size', x='Time (ps)',y='(nm)') +
+  guides(colour = guide_legend(override.aes = list(alpha=1)), shape = guide_legend(override.aes = list(alpha=1)))
+print(p)
+```
+
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+df <- read_many_files(directories,'rmsd.xvg',category_name,categories,col_names=c('time','value'))
+p <- ggplot(df, aes(x=time, y=value, color=Ligand)) + 
+  geom_point(alpha=0.3) + 
+  geom_smooth(method="loess",span=span,se=FALSE) + 
+  labs(title='RMSD', x='Time (ps)',y='(nm)') +
+  guides(colour = guide_legend(override.aes = list(alpha=1)))
+print(p)
+
+```
+
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+df <- read_many_files(directories,'sasa.xvg',category_name,categories,col_names=c('time','value'))
+p <- ggplot(df, aes(x=time, y=value, color=Ligand)) + 
+  geom_point(alpha=0.3) + 
+  geom_smooth(method="loess",span=span,se=FALSE) + 
+  labs(title='SASA', x='Time (ps)',y=expression((nm^{2}))) +
+  guides(colour = guide_legend(override.aes = list(alpha=1)))
+print(p)
+
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+df <- read_many_files(directories,'gyrate.xvg',category_name,categories,col_names=c('time','radius','rx','ry','rz'))
+p <- ggplot(df, aes(x=time, y=radius, color=Ligand)) + 
+  geom_point(alpha=0.3) + 
+  geom_smooth(method="loess",span=span,se=FALSE) + 
+  labs(title='Gyration Radius', x='Time (ps)',y='(nm)') +
+  guides(colour = guide_legend(override.aes = list(alpha=1)))
+print(p)
+
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=5}
+s.rmsf<-read_xvg('S1PR1_Lys+S1P/rmsf.xvg', column_names = c('res','rmsf'))
+s.rmsf$seq<-seq(1,nrow(s.rmsf))
+s.rmsf$Ligand<-ifelse(s.rmsf$res>1000,'S1P-Lys','S1P')
+s.rmsf$grp<-1
+f.rmsf<-read_xvg('S1PR1_Lys+FP/rmsf.xvg', column_names = c('res','rmsf'))
+f.rmsf$seq<-seq(1,nrow(f.rmsf))
+f.rmsf$grp<-2
+f.rmsf$Ligand<-ifelse(f.rmsf$res>1000,'FP-Lys','FP')
+rmsf<-rbind(s.rmsf,f.rmsf)
+p<-ggplot(rmsf, aes(x=seq,y=rmsf,colour=Ligand,group=grp))+geom_line(size=.8)+labs(title='RMSF', x='Residue',y='(nm)')
+print(p)
+
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+df <- read_many_files(directories,'hbnum.xvg',category_name,categories,col_names=c('time','value','v2'))
+p <- ggplot(df, aes(x=time, y=value, color=Ligand)) + 
+  geom_point(alpha=0.3) + 
+  geom_smooth(method="loess",span=span,se=FALSE) + 
+  labs(title='Number of H Bonds in Transmembrane part', x='Time (ps)',y='') +
+  guides(colour = guide_legend(override.aes = list(alpha=1)))
+print(p)
+
+```
+
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+df <- read_many_files(directories,'hbnum_lig.xvg',category_name,categories,col_names=c('time','value','v2'))
+p <- ggplot(df, aes(x=time, y=value, color=Ligand)) + 
+  geom_point(alpha=0.3) + 
+  geom_smooth(method="loess",span=span,se=FALSE) + 
+  labs(title='Number of H Bonds between Transmembrane and Ligand', x='Time (ps)',y='') +
+  guides(colour = guide_legend(override.aes = list(alpha=1)))
+print(p)
+
+```
+
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+```
+
+# Detail of Contacts 
+
+H Bonds were computed with GROMACS using .35 nm for distance cutoff and 30&deg; for angle cutoff.
+
+* meeting of both cutoff conditions is shown in the lower part of the graph. 
+
+* in case more than one H Bond between a pair of residue the minimum distance and the union of angle and distance cutoffs consensus have been considered
+
+Salt Bridges were computed with VMD.
+
+* To be consiedered as a salt bridge a contact should happen such that the minimum distance between any oxygens in the acid residue and any of the niteogens od the basic residue is below a cutoff of 0.32 nm in at least 1 frame. 
+
+* Once the cutoff is reached distance is measured between the center of mass of the oxygens and the center of mass of the nitrogens.
+
+## Potein Protein Contacts
+
+a minimum distance (along the chain) of 4 residues has been considered for both H Bonds and Salt Bridges.
+
+
+
+```{r, echo=FALSE}
+
+```
+
+### Helix 1 vs 7
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('ASN63-SER304')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bridges<-c('GLU294-LYS41')
+p<-plot_saltbr(directories, saltbr, bridges, category_name, categories, dt=100)
+print(p)
+```
+
+### Helix 1 vs ICL1
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('HIS77-TRP71')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+## Helix 1 vs C Term
+
+```{r echo=FALSE, fig.width=10, fig.height=5}
+bridges<-c('GLU62-ARG319', 'GLU62-ARG328')
+p<-plot_saltbr(directories, saltbr, bridges, category_name, categories, dt=100)
+print(p)
+
+```
+
+### Helix 2 vs 3
+
+```{r echo=FALSE, fig.width=10, fig.height=13}
+bonds<-c('ASN101-ARG120','ASN101-GLU121','ARG120-LEU104','ASN86-SER134','SER131-ASP91')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+### Helix 2 vs 4
+
+```{r echo=FALSE, fig.width=10, fig.height=5}
+bonds<-c('ASN86-TRP168','TYR82-ASN157')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+
+### Helix 2 vs 6
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('TYR81-GLU250')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+
+### Helix 2 vs 7
+
+```{r echo=FALSE, fig.width=10, fig.height=7}
+bonds<-c('ASN307-ASP91','SER304-ASP91','TYR81-ASN315')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+### Helix 2 vs ECL1
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('THR108-LEU103')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+### Helix 3 vs 4
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('SER129-SER171')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+
+### Helix 3 vs 5
+```{r echo=FALSE, fig.width=10, fig.height=5}
+bonds<-c('TYR143-ARG223','TYR221-LEU135')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+
+### Helix 3 vs 6
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('ARG142-ASN251')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+### Helix 3 vs 7
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('TYR311-ASP91')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+
+### Helix 3 vs N Ter
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('TYR29-TRP117')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+
+
+### Helix 3 vs ICL2
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('MET149-ILE144')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+### Helix 3 vs ECL2
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('TYR198-PHE118')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+
+### Helix 3 vs ECL1
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('THR109-ARG120')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+### Helix 4 vs 5
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('TYR202-LEU174')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+
+### Helix 4 vs ECL2
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('TRP182-LEU177')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+
+### Network Helix 5 vs Helix 6 vs ECL2
+
+```{r echo=FALSE, fig.width=10, fig.height=13}
+bonds<-c('LYS200-ASP279','LYS200-VAL280','LYS200-CYS282','LYS200-SER190','LYS200-CYS191')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bridges<-('ASP279-Lys200')
+p<-plot_saltbr(directories, saltbr, bridges, category_name, categories, dt=dt)
+print(p)
+
+```
+
+
+###  Helix 6 vs Helix 7
+
+```{r echo=FALSE, fig.width=10, fig.height=7}
+bonds<-c('THR257-THR314','THR257-ASN315','TRP269-ASN303')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+
+###  Helix 6 vs ICL1
+
+```{r echo=FALSE, fig.width=10, fig.height=5}
+bonds<-c('ARG78-GLU250','LYS75-GLU250')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+###  Helix 6 vs ICL1
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('SER192-ASP279')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=5}
+bridges<-c('GLU250-ARG78', 'GLU250-LYS75')
+p<-plot_saltbr(directories, saltbr, bridges, category_name, categories, dt=100)
+print(p)
+```
+
+###  Helix 6 vs ECL2
+
+```{r echo=FALSE, fig.width=10, fig.height=5}
+bonds<-c('THR193-ASP279','VAL194-ASP279')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+
+
+### Helix 7 N Ter
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('LYS41-GLU294')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+
+```
+
+### N Ter
+
+```{r echo=FALSE, fig.width=10, fig.height=5}
+bonds<-c('LEU35-TYR29','LYS34-TYR29')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bridges<-('ASP18-ARG27')
+p<-plot_saltbr(directories, saltbr, bridges, category_name, categories, dt=dt)
+print(p)
+```
+
+### N Ter vs ECL1
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('SER38-TYR110')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+```
+
+
+### N Ter vs ECL2
+
+```{r echo=FALSE, fig.width=10, fig.height=5}
+bonds<-c('LYS34-TYR29','TYR31-LEU188')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+
+### N Ter vs ECL3
+
+```{r echo=FALSE, fig.width=10, fig.height=5}
+bonds<-c('LYS285-TYR31','LYS34-PHE291')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+### ICL1 vs C Ter
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('LYS75-GLU317')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bridges<-c('GLU317-LYS75')
+p<-plot_saltbr(directories, saltbr, bridges, category_name, categories, dt=100)
+print(p)
+```
+
+### ECL2
+
+```{r echo=FALSE, fig.width=10, fig.height=5}
+bonds<-c('CYS184-LEU197','SER192-TYR198')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+### ECL2 vs ECL3
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('THR193-LYS285')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+### ECL2 vs N Ter
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+bonds<-c('HIS28-CYS184')
+p<-plot_hbonds(directories, hbonds_tm, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+
+
+## Ligand vs Protein Contacts
+
+### Sphingosine 1 Phosphate H Bonds
+
+|   n.|          Donor          |  Hydrogen   |         Acceptor        | occup.|
+|-----|:-----------------------:|:-----------:|:-----------------------:|------:|
+|   0 |  TYR 29       OH 238    |   HH 239    |  LIG 1515     O2 7541   |  44%  |
+|   1 |  TYR 29       OH 238    |   HH 239    |  LIG 1515     O3 7542   |  19%  |
+|   2 |  TYR 29       OH 238    |   HH 239    |  LIG 1515     O4 7543   |  38%  |
+|   3 |  LYS 34       NZ 318    |  HZ1 319    |  LIG 1515     O2 7541   |   3%  |
+|   4 |  LYS 34       NZ 318    |  HZ1 319    |  LIG 1515     O3 7542   |   2%  |
+|   5 |  LYS 34       NZ 318    |  HZ1 319    |  LIG 1515     O4 7543   |   0%  |
+|   6 |  SER 38       OG 383    |  HG1 384    |  LIG 1515     O2 7541   |   1%  |
+|   7 |  SER 38       OG 383    |  HG1 384    |  LIG 1515     O3 7542   |   2%  |
+|   8 |  SER 38       OG 383    |  HG1 384    |  LIG 1515     O4 7543   |   2%  |
+|   9 |  ASN 101     ND2 1423   | HD21 1424   |  LIG 1515      N 7544   |  14%  |
+|  10 |  SER 105      OG 1492   |  HG1 1493   |  LIG 1515      **O 7539**   |   1%  |
+|  11 |  SER 105      OG 1492   |  HG1 1493   |  LIG 1515     O1 7540   |   5%  |
+|  12 |  SER 105      OG 1492   |  HG1 1493   |  LIG 1515     O2 7541   |   3%  |
+|  13 |  SER 105      OG 1492   |  HG1 1493   |  LIG 1515     O3 7542   |   2%  |
+|  14 |  SER 105      OG 1492   |  HG1 1493   |  LIG 1515     O4 7543   |   5%  |
+|  15 |  GLY 106       N 1496   |   HN 1497   |  LIG 1515     O2 7541   |  11%  |
+|  16 |  GLY 106       N 1496   |   HN 1497   |  LIG 1515     O3 7542   |  34%  |
+|  17 |  GLY 106       N 1496   |   HN 1497   |  LIG 1515     O4 7543   |  33%  |
+|  18 |  THR 109     OG1 1533   |  HG1 1534   |  LIG 1515     O2 7541   |  14%  |
+|  19 |  THR 109     OG1 1533   |  HG1 1534   |  LIG 1515     O3 7542   |   6%  |
+|  20 |  THR 109     OG1 1533   |  HG1 1534   |  LIG 1515     O4 7543   |  16%  |
+|  21 |  ARG 120     NH1 1737   | HH11 1738   |  LIG 1515     O2 7541   |   4%  |
+|  22 |  ARG 120     NH1 1737   | HH11 1738   |  LIG 1515     O3 7542   |   1%  |
+|  23 |  ARG 120     NH1 1737   | HH11 1738   |  LIG 1515     O4 7543   |   4%  |
+|  24 |  ARG 120     NH2 1740   | HH21 1741   |  LIG 1515     O1 7540   |   0%  |
+|  25 |  ARG 120     NH2 1740   | HH21 1741   |  LIG 1515     O2 7541   |  39%  |
+|  26 |  ARG 120     NH2 1740   | HH21 1741   |  LIG 1515     O3 7542   |  15%  |
+|  27 |  ARG 120     NH2 1740   | HH21 1741   |  LIG 1515     O4 7543   |  43%  |
+|  28 |  LIG 1515      N 7544   |    H 7545   |  ASN 101     OD1 1422   |  31%  |
+|  29 |  LIG 1515      N 7544   |    H 7545   |  ARG 120     NH2 1740   |   1%  |
+|  30 |  LIG 1515      N 7544   |    H 7545   |  GLU 121     OE1 1756   |  37%  |
+|  31 |  LIG 1515      N 7544   |    H 7545   |  GLU 121     OE2 1757   |  37%  |
+
+## Fingolimod H Bonds
+
+|   n.|          Donor          |  Hydrogen   |         Acceptor        | occup.|
+|-----|:-----------------------:|:-----------:|:-----------------------:|------:|
+|   0 |  TYR 29       OH 238    |   HH 239    |  LIG 1515     O2 7547   |  58%  |
+|   1 |  TYR 29       OH 238    |   HH 239    |  LIG 1515     O3 7548   |   4%  |
+|   2 |  TYR 29       OH 238    |   HH 239    |  LIG 1515     O4 7549   |  38%  |
+|   3 |  LYS 34       NZ 318    |  HZ1 319    |  LIG 1515     O2 7547   |   3%  |
+|   4 |  LYS 34       NZ 318    |  HZ1 319    |  LIG 1515     O3 7548   |   0%  |
+|   5 |  SER 38       OG 383    |  HG1 384    |  LIG 1515     O2 7547   |   0%  |
+|   6 |  SER 38       OG 383    |  HG1 384    |  LIG 1515     O3 7548   |   0%  |
+|   7 |  SER 38       OG 383    |  HG1 384    |  LIG 1515     O4 7549   |   1%  |
+|   8 |  ASN 101     ND2 1423   | HD21 1424   |  LIG 1515      N 7550   |   2%  |
+|   9 |  SER 105      OG 1492   |  HG1 1493   |  LIG 1515      **O 7545**   |   7%  |
+|  10 |  SER 105      OG 1492   |  HG1 1493   |  LIG 1515     O2 7547   |   1%  |
+|  11 |  SER 105      OG 1492   |  HG1 1493   |  LIG 1515     O3 7548   |   0%  |
+|  12 |  SER 105      OG 1492   |  HG1 1493   |  LIG 1515     O4 7549   |   2%  |
+|  13 |  GLY 106       N 1496   |   HN 1497   |  LIG 1515     O2 7547   |   3%  |
+|  14 |  GLY 106       N 1496   |   HN 1497   |  LIG 1515     O3 7548   |  34%  |
+|  15 |  GLY 106       N 1496   |   HN 1497   |  LIG 1515     O4 7549   |  52%  |
+|  16 |  THR 109     OG1 1533   |  HG1 1534   |  LIG 1515     O2 7547   |  11%  |
+|  17 |  THR 109     OG1 1533   |  HG1 1534   |  LIG 1515     O3 7548   |  13%  |
+|  18 |  THR 109     OG1 1533   |  HG1 1534   |  LIG 1515     O4 7549   |  42%  |
+|  19 |  ARG 120     NH1 1737   | HH11 1738   |  LIG 1515     O2 7547   |   5%  |
+|  20 |  ARG 120     NH1 1737   | HH11 1738   |  LIG 1515     O3 7548   |   0%  |
+|  21 |  ARG 120     NH1 1737   | HH11 1738   |  LIG 1515     O4 7549   |   3%  |
+|  22 |  ARG 120     NH2 1740   | HH21 1741   |  LIG 1515     O2 7547   |  59%  |
+|  23 |  ARG 120     NH2 1740   | HH21 1741   |  LIG 1515     O3 7548   |   3%  |
+|  24 |  ARG 120     NH2 1740   | HH21 1741   |  LIG 1515     O4 7549   |  38%  |
+|  25 |  ARG 292     NH1 6890   | HH11 6891   |  LIG 1515      **O 7545**   |   2%  |
+|  26 |  ARG 292     NH1 6890   | HH11 6891   |  LIG 1515     O1 7546   |   0%  |
+|  27 |  ARG 292     NH1 6890   | HH11 6891   |  LIG 1515     O2 7547   |  20%  |
+|  28 |  ARG 292     NH1 6890   | HH11 6891   |  LIG 1515     O3 7548   |  19%  |
+|  29 |  ARG 292     NH1 6890   | HH11 6891   |  LIG 1515     O4 7549   |   2%  |
+|  30 |  ARG 292     NH2 6893   | HH21 6894   |  LIG 1515      **O 7545**   |   3%  |
+|  31 |  ARG 292     NH2 6893   | HH21 6894   |  LIG 1515     O1 7546   |   1%  |
+|  32 |  ARG 292     NH2 6893   | HH21 6894   |  LIG 1515     O2 7547   |   5%  |
+|  33 |  ARG 292     NH2 6893   | HH21 6894   |  LIG 1515     O3 7548   |   3%  |
+|  34 |  ARG 292     NH2 6893   | HH21 6894   |  LIG 1515     O4 7549   |   0%  |
+|  35 |  LIG 1515      N 7550   |   H1 7564   |  ASN 101     OD1 1422   |  98%  |
+|  36 |  LIG 1515      N 7550   |   H1 7564   |  ASN 101       O 1427   |   0%  |
+|  37 |  LIG 1515      N 7550   |   H1 7564   |  SER 105      OG 1492   |  77%  |
+|  38 |  LIG 1515      N 7550   |   H1 7564   |  ARG 120      NE 1734   |   0%  |
+|  39 |  LIG 1515      N 7550   |   H1 7564   |  ARG 120     NH2 1740   |   2%  |
+|  40 |  LIG 1515      N 7550   |   H1 7564   |  GLU 121     OE1 1756   |  69%  |
+|  41 |  LIG 1515      N 7550   |   H1 7564   |  GLU 121     OE2 1757   |  76%  |
+
+In the above tables ligand hydroxyl oxygens are typeset in **bold**.
+
+```{r echo=FALSE, fig.width=10, fig.height=19}
+bonds<-c('TYR29-LIG1515','THR109-LIG1515','SER38-LIG1515','SER105-LIG1515',
+         'LYS34-LIG1515','LIG1515-GLU121','GLY106-LIG1515',
+         'ASN101-LIG1515','ARG120-LIG1515' )
+p<-plot_hbonds(directories, hbonds_lig, bonds, category_name, categories, delta=delta, base=base, diam=diam)
+print(p)
+```
+```{r echo=FALSE, fig.width=10, fig.height=7}
+bridges<-c('LIG1515-ARG120','LIG1515-LYS34','GLU121-LIG1515')
+p<-plot_saltbr(directories, 'saltbr_lig', bridges, category_name, categories, dt=100)
+print(p)
+```
+
+# 3x46 switch
+
+```{r 3x46_switch_1, echo=FALSE, fig.width=10, fig.height=5}
+file_name <-'mindist_i138_v258.xvg'
+df1 <-read_many_files(directories, file_name, category_name, categories, col_names)
+df1$interaction<-'3x46 - 6x37'
+file_name <-'mindist_i138_y311.xvg'
+df2 <-read_many_files(directories, file_name, category_name, categories, col_names)
+df2$interaction<-'3x46 - 7x53'
+df<-rbind(df1,df2)
+p <- ggplot(df, aes(x=time, y=distance, color=Ligand)) +
+  geom_point(alpha=0.2) +
+  labs(title='Minimum Distance', x='Time (ps)', y='Distance (nm)') +
+  geom_smooth(method="loess",span = span,se=F) +
+  guides(colour = guide_legend(override.aes = list(alpha=1)))+
+  facet_grid(interaction ~ .)+coord_cartesian(ylim=c(0,1))
+print(p)
+```
+
+
+```{r 3x46_switch_2, echo=FALSE,fig.width=10, fig.height=5}
+file_name <-'ncontact_i138_v258.xvg'
+df1 <-read_many_files(directories, file_name, category_name, categories, col_names)
+df1$interaction<-'3x46 - 6x37'
+file_name <-'ncontact_i138_y311.xvg'
+df2 <-read_many_files(directories, file_name, category_name, categories, col_names)
+df2$interaction<-'3x46 - 7x53'
+df<-rbind(df1,df2)
+p <- ggplot(df, aes(x=time, y=distance, color=Ligand)) +
+  geom_point(alpha=0.2) +
+  labs(title='Number of Contacts < 0.6 nm', x='Time (ps)', y='Number') +
+  geom_smooth(method="loess",span = span,se=F) +
+  guides(colour = guide_legend(override.aes = list(alpha=1)))+
+  facet_grid(interaction ~ .)
+print(p)
+
+```
+# Clusters
+
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+df <- read_many_files(directories,'rmsd-distribution.xvg',category_name,categories,col_names=c('rms','au'))
+p <- ggplot(df, aes(x=rms, y=au, color=Ligand, group=Ligand)) + 
+  geom_line() + 
+  labs(title='RMSD Distribution of Transmembrane part', x='RMSD (nm)',y='a.u.') +
+  guides(colour = guide_legend(override.aes = list(alpha=1)))
+print(p)
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+df <- read_many_files(directories,'rmsd-clust-transitions-0.2.xvg',category_name,categories,col_names=c('clid','ntrans'))
+df$clid<-factor(df$clid)
+p <- ggplot(df, aes(x=clid, y=ntrans, color=Ligand, fill=Ligand)) + 
+  geom_bar(stat="identity", position = "dodge") + 
+  labs(title='Cluster transitions', x='Cluster #',y='# transitions') +
+  guides(colour = guide_legend(override.aes = list(alpha=1)))
+print(p)
+
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+df <- read_many_files(directories,'rmsd-clust-id-over-time-0.2.xvg',category_name,categories,col_names=c('time','cluster'))
+df$cluster<-factor(df$cluster)
+p <- ggplot(df, aes(x=time, y=cluster, color=Ligand, group=Ligand)) + 
+  geom_point(alpha=0.2) + 
+  labs(title='Clusters', x='Time (ps)',y='Cluster #') +
+  guides(colour = guide_legend(override.aes = list(alpha=1)))
+print(p)
+
+```
+
+
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+df <- read_many_files(directories,'eigenval.xvg',category_name,categories,col_names=c('eig','val'))
+
+df<-subset(df, eig <= 6)
+
+df$eig<-factor(df$eig)
+p <- ggplot(df, aes(x=eig, y=val, color=Ligand, group=Ligand)) + 
+  geom_point(alpha=1) + 
+  labs(title='Eigenvalues', x='Eigenvalue #',y=expression((nm^{2}))) +
+  guides(colour = guide_legend(override.aes = list(alpha=1)))
+print(p)
+```
+
+
+
+```{r echo=FALSE, fig.width=10, fig.height=13}
+df <- read_many_files(directories,'eigrmsf.xvg',category_name,categories,col_names=c('atom','rmsf'))
+names(df) <-c("atom", "rmsf", "eig", "Ligand")
+p <- ggplot(df, aes(x=atom, y=rmsf, color=Ligand, group=Ligand)) + 
+  geom_line() + facet_grid(eig ~ .) +
+  labs(title='RMSF per eigenvector of Transmembrane part', x='Atom #',y='RMS (nm)') +
+  guides(colour = guide_legend(override.aes = list(alpha=1)))
+print(p)
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=3.5}
+```
+
