@@ -303,14 +303,12 @@ if __name__ == '__main__':
     p.add_argument('-n', action=check_read_ext('ndx'), required=False, dest='index_file',
                    help='index file')
     p.add_argument('-dt', type=int, required=False,
-                   help=' selection2')
+                   help=' compute timestep (ps)')
     p.add_argument('-b', nargs='?', type=int, dest='begin', required=False, default=0,
                    help='begin time for existence check (ps), defaults to 0')
     p.add_argument('-e', type=int, dest='end', required=False, help='end time for existence check (ps)')
     p.add_argument('-t', nargs='?', type=int, dest='threshold', required=False,
                    help='occupancy threshold to accept hbond (percent), defaults to 0', default=0)
-    p.add_argument('-min-res-dist', nargs='?', dest='min_res_dist', required=False, type=int, default=0,
-                   help='consider hbonds with residue number difference greater than, defaults to 0 ')
     args = p.parse_args()
 
     ###############################################
@@ -455,31 +453,29 @@ if __name__ == '__main__':
     bond_index = 0
     bond_number = 0
     for the_line, the_occupancy in zip(lines, occupancy):
-        # TODO remove if true
-        if True:  # the_occupancy > threshold:
-            dnum, hnum, anum = the_line.strip().split()
-            dname = atoms[dnum]['aname']
-            drname = atoms[dnum]['rname']
-            drnum = atoms[dnum]['rnum']
-            hname = atoms[hnum]['aname']
-            aname = atoms[anum]['aname']
-            arname = atoms[anum]['rname']
-            arnum = atoms[anum]['rnum']
-            if abs(int(drnum) - int(arnum)) > args.min_res_dist and the_occupancy > threshold:
-                list_handle.write("{:>4} | ".format(str(bond_number)))
-                list_handle.write("{:>4} {:6} {:>4} {:6} | ".format(drname, drnum, dname, dnum))
-                list_handle.write("{:>4} {:6} | ".format(hname, hnum))
-                list_handle.write("{:>4} {:6} {:>4} {:6} | {:>3}%\n".format(arname, arnum, aname, anum,
-                                                                            int(round(the_occupancy * 100.0, 0))))
-                columns.append(bond_index)
-                labels.append("{}{}-{}{}".format(drname, drnum, arname, arnum))
-                # groups_handle.write("[ {}{}_{}{} ]\n".format(drname, drnum, arname, arnum))
-                # groups_handle.write("{0:>6} {1:>6}\n".format(dnum, anum))
-                # select_string += str(bond_number) + '\n'
-                bond_number += 1
-            select_string += str(bond_index) + '\n'
-            groups_handle.write("[ {}{}_{}{} ]\n".format(drname, drnum, arname, arnum))
-            groups_handle.write("{0:>6} {1:>6}\n".format(dnum, anum))
+        dnum, hnum, anum = the_line.strip().split()
+        dname = atoms[dnum]['aname']
+        drname = atoms[dnum]['rname']
+        drnum = atoms[dnum]['rnum']
+        hname = atoms[hnum]['aname']
+        aname = atoms[anum]['aname']
+        arname = atoms[anum]['rname']
+        arnum = atoms[anum]['rnum']
+        if the_occupancy >= threshold:
+            list_handle.write("{:>4} | ".format(str(bond_number)))
+            list_handle.write("{:>4} {:6} {:>4} {:6} | ".format(drname, drnum, dname, dnum))
+            list_handle.write("{:>4} {:6} | ".format(hname, hnum))
+            list_handle.write("{:>4} {:6} {:>4} {:6} | {:>3}%\n".format(arname, arnum, aname, anum,
+                                                                        int(round(the_occupancy * 100.0, 0))))
+            columns.append(bond_index)
+            labels.append("{}{}-{}{}".format(drname, drnum, arname, arnum))
+            # groups_handle.write("[ {}{}_{}{} ]\n".format(drname, drnum, arname, arnum))
+            # groups_handle.write("{0:>6} {1:>6}\n".format(dnum, anum))
+            # select_string += str(bond_number) + '\n'
+            bond_number += 1
+        select_string += str(bond_index) + '\n'
+        groups_handle.write("[ {}{}_{}{} ]\n".format(drname, drnum, arname, arnum))
+        groups_handle.write("{0:>6} {1:>6}\n".format(dnum, anum))
         bond_index += 1
     groups_handle.close()
     list_handle.close()
